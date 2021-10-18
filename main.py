@@ -180,6 +180,9 @@ def h1(state):
     return sum(abs(b % board_side - g % board_side) + abs(b//board_side - g//board_side)
                for b, g in ((state.index(i), goal_state.index(i)) for i in range(1, board_len)))
 
+def h2(state):
+    return 0
+
 def read(configuration):
 
     global board_len, board_side
@@ -200,7 +203,7 @@ def export(frontier, time):
 
     moves = backtrace()
 
-    file = open('output.txt', 'w')
+    file = open('output.txt','a')
     file.write("path_to_goal: " + str(moves))
     file.write("\ncost_of_path: " + str(len(moves)))
     file.write("\nnodes_expanded: " + str(nodes_expanded))
@@ -209,12 +212,13 @@ def export(frontier, time):
     file.write("\nsearch_depth: " + str(goal_node.depth))
     file.write("\nmax_search_depth: " + str(max_search_depth))
     file.write("\nrunning_time: " + format(time, '.8f'))
+    file.write("\n\n")
     file.close()
 
 def backtrace():
 
     current_node = goal_node
-
+    
     while initial_state != current_node.state:
 
         if current_node.move == 1:
@@ -240,7 +244,7 @@ def main():
     #parser.add_argument('board')
     #args = parser.parse_args()
 
-    read("1,0,2,3,4,5,6,7,8")
+    read("7,2,4,5,0,6,8,3,1")
 
     #function = function_map[args.algorithm]
 
