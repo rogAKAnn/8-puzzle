@@ -1,35 +1,13 @@
 import argparse
+import random
+import numpy as np
 import timeit
 from collections import deque
 from heapq import heappush, heappop, heapify
 import itertools
 import os
+from State import State
 
-
-class State:
-
-    def __init__(self, state, parent, move, depth, cost, key):
-
-        self.state = state
-
-        self.parent = parent
-
-        self.move = move
-
-        self.depth = depth
-
-        self.cost = cost
-
-        self.key = key
-
-        if self.state:
-            self.map = ''.join(str(e) for e in self.state)
-
-    def __eq__(self, other):
-        return self.map == other.map
-
-    def __lt__(self, other):
-        return self.map < other.map
 
 goal_state = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 goal_node = State
@@ -43,6 +21,22 @@ max_frontier_size = 0
 
 moves = list()
 costs = set()
+
+def init():
+    global goal_state, goal_node, initial_state, board_len, board_side, nodes_expanded, max_search_depth, max_frontier_size, moves, costs
+
+    goal_state = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+    goal_node = State
+    initial_state = list()
+    board_len = 0
+    board_side = 0
+
+    nodes_expanded = 0
+    max_search_depth = 0
+    max_frontier_size = 0
+
+    moves = list()
+    costs = set()
 
 
 def move(state, position):
@@ -113,19 +107,19 @@ def expand(node):
 
     nodes = [neighbor for neighbor in neighbors if neighbor.state]
 
-    return nodes
+    return nodes #List of state of next move
 
-def ast(start_state):
+def ast(start_state, h):
 
     global max_frontier_size, goal_node, max_search_depth
 
     explored, heap, heap_entry, counter = set(), list(), {}, itertools.count()
 
-    key = h1(start_state)
+    key = h(start_state)
 
     root = State(start_state, None, None, 0, 0, key)
 
-    entry = (key, 0, root)
+    entry = (key, 0, root) 
 
     heappush(heap, entry)
 
@@ -145,7 +139,7 @@ def ast(start_state):
 
         for neighbor in neighbors:
 
-            neighbor.key = neighbor.cost + h1(neighbor.state)
+            neighbor.key = neighbor.cost + h(neighbor.state)
 
             entry = (neighbor.key, neighbor.move, neighbor)
 
@@ -175,40 +169,70 @@ def ast(start_state):
         if len(heap) > max_frontier_size:
             max_frontier_size = len(heap)
 
-def h1(state):
+def h1(state): #mahattan
 
     return sum(abs(b % board_side - g % board_side) + abs(b//board_side - g//board_side)
                for b, g in ((state.index(i), goal_state.index(i)) for i in range(1, board_len)))
 
+def h2(state): #misplaced tile
+    return sum([0 if b==g else 1 for b,g in ((state.index(i),goal_state.index(i)) for i in range(1, board_len))])
+
+def h3(state): #Gashnig
+    count = 0
+    temp = state + []
+    while temp != goal_state:
+        if temp.index(0) == goal_state.index(0):
+            for i in range(1,board_len):
+                if temp.index(i) != goal_state.index(i):
+                    index0 = temp.index(0)
+                    indexMatchedTile = temp.index(i)
+                    temp[index0] = i
+                    temp[indexMatchedTile] = 0
+                    break
+        else:
+            index0 = temp.index(0) # 0 dang tai vi o day
+            MatchedTile = goal_state[index0] # Vi tri dang le o do
+            temp[temp.index(MatchedTile)] = 0
+            temp[index0] = MatchedTile
+        count += 1
+    return count
+
+
+     
+
 def read(configuration):
 
-    global board_len, board_side
+    global board_len, board_side, initial_state
 
-    data = configuration.split(",")
-
-    for element in data:
-        initial_state.append(int(element))
+    initial_state = configuration
 
     board_len = len(initial_state)
 
     board_side = int(board_len ** 0.5)
 
 
-def export(frontier, time):
+def export(frontier, time, n,ouput1):
 
-    global moves
+    global moves, o
 
     moves = backtrace()
 
-    file = open('output.txt', 'w')
-    file.write("path_to_goal: " + str(moves))
-    file.write("\ncost_of_path: " + str(len(moves)))
-    file.write("\nnodes_expanded: " + str(nodes_expanded))
-    file.write("\nfringe_size: " + str(len(frontier)))
-    file.write("\nmax_fringe_size: " + str(max_frontier_size))
-    file.write("\nsearch_depth: " + str(goal_node.depth))
-    file.write("\nmax_search_depth: " + str(max_search_depth))
-    file.write("\nrunning_time: " + format(time, '.8f'))
+    file = open(ouput1, 'a')
+
+    m = [len(moves)] + [nodes_expanded] + [len(frontier)] + [max_frontier_size] + [goal_node.depth] + [max_search_depth] + [time]
+    o += [m] 
+
+    file.write('|' +format(str(n), "^5"))
+    file.write('|' +format(str(initial_state), "^30"))
+
+    file.write('|' +format(str(len(moves)), "^15"))
+    file.write('|' +format(str(nodes_expanded), "^15" ))
+    file.write('|' +format(str(len(frontier)), "^15" ))
+    file.write('|' +format(str(max_frontier_size), "^20" ))
+    file.write('|' +format(str(goal_node.depth), "^15" ))
+    file.write('|' +format(str(max_search_depth), "^18" ))
+    file.write('|' +format(time, '^20.8f')+'|'  + '\n')
+
     file.close()
 
 def backtrace():
@@ -231,26 +255,96 @@ def backtrace():
 
     return moves
 
+def isSolvable(state):
+    invCount = 0
+    for i in range(2, len(state)):
+        for j in range (1, i):
+            if state.index(i) < state.index(j):
+                invCount = invCount + 1
+    return invCount % 2 == 0
+        
 
+def export_(input, output):
+    global o
+
+    o = []
+
+    file = open(output, 'w')
+
+    file.write(('h1: Manhattan' if output == 'output_h1.txt' else 'h2: Misplaced Tiles' if output=='output_h2.txt' else 'h3: Gashnig') + '\n')
+    file.write('|' +format('ID', "^5"))
+    file.write('|' +format('input', "^30"))
+
+    file.write('|' +format('cost of path', "^15"))
+    file.write('|' +format('nodes expanded', "^15" ))
+    file.write('|' +format('fringe size', "^15" ))
+    file.write('|' +format('max frontier size', "^20" ))
+    file.write('|' +format('search depth', "^15" ))
+    file.write('|' +format('max search depth', "^18" ))
+    file.write('|' +format('running time', '^20')+'|'  + '\n')
+
+    file.close()
+
+
+    count1 = 0
+    for x in input:
+            init()
+            read(x)
+            start = timeit.default_timer()
+            frontier = ast(x, h1 if output == 'output_h1.txt' else h2 if output == 'output_h2.txt' else h3)
+            stop = timeit.default_timer()
+            export(frontier, stop-start, count1 + 1, output)
+            count1 += 1
+
+    o1 = np.average(o,0)
+
+    file = open(output, 'a')
+
+    file.write( '\n|' +format('Average', "^36"))
+
+    file.write('|' +format(str(o1[0]), "^15"))
+    file.write('|' +format(str(o1[1]), "^15" ))
+    file.write('|' +format(str(o1[2]), "^15" ))
+    file.write('|' +format(str(o1[3]), "^20" ))
+    file.write('|' +format(str(o1[4]), "^15" ))
+    file.write('|' +format(str(o1[5]), "^18" ))
+    file.write('|' +format(o1[6], '^20.8f')  + '|\n' )
+
+    file.close()
+
+
+def printBoard(state):
+    global board_side
+    for i in range(0, board_len, board_side):
+        print(state[i],end='')
+        for j in range(i+1,i+board_side):
+            print(' |', state[j], end='')
+        print()
+    print("---------")
+
+o = []
+            
 def main():
+    
+    test_number = 10
+    count = 0
+    input = []
+    while count != test_number:
+        init()
+        initial_state = goal_state + []
+        random.shuffle(initial_state)     
+        if(isSolvable(initial_state)):
+            input += [initial_state]
+            count += 1
 
-    #parser = argparse.ArgumentParser()
+    output1 = 'output_h1.txt'
+    output2 = 'output_h2.txt'
+    output3 = 'output_h3.txt'
 
-    #parser.add_argument('algorithm')
-    #parser.add_argument('board')
-    #args = parser.parse_args()
+    export_(input, output1)
+    export_(input, output2)
+    export_(input, output3)
 
-    read("1,0,2,3,4,5,6,7,8")
-
-    #function = function_map[args.algorithm]
-
-    start = timeit.default_timer()
-
-    frontier = ast(initial_state)
-
-    stop = timeit.default_timer()
-
-    export(frontier, stop-start)
 
 
 if (__name__ == '__main__'):
