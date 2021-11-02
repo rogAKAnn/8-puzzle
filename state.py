@@ -1,4 +1,3 @@
-
 class State:
 
     def __init__(self, state, parent, move, depth, cost, key):
